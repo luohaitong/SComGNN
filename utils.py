@@ -8,6 +8,7 @@ import random
 import pandas as pd
 import copy as cp
 from torch.utils.data import Dataset
+from sklearn.preprocessing import KBinsDiscretizer
 import json
 
 ###############################################
@@ -354,8 +355,9 @@ def pair_construct_1(item_dict, num_items, neg_num, random_seed=0):
 
     return train_triple_pair, test_triple_pair
 
-def pair_construct_2(item_dict, num_items, neg_num):
+def pair_construct_2(item_dict, num_items, neg_num, random_seed = 1):
 
+    random.seed(random_seed)
     all_items = np.arange(num_items)
     train_triple_pair = []
     val_triple_pair = []
@@ -364,7 +366,7 @@ def pair_construct_2(item_dict, num_items, neg_num):
         pos_list = item_dict[key_item]
         neg_list = list(set(all_items)-set(pos_list))
         neg_sample = random.sample(neg_list, len(pos_list)+ 2 * neg_num - 2)
-        for i in range(len(pos_list)-1):
+        for i in range(len(pos_list)-2):
             train_triple_pair.append([int(key_item), int(pos_list[i]), int(neg_sample[i])])
 
         tem = [ int(key_item), int(pos_list[len(pos_list)-2])]
@@ -380,6 +382,93 @@ def pair_construct_2(item_dict, num_items, neg_num):
     test_triple_pair = np.array(test_triple_pair)
 
     return train_triple_pair, val_triple_pair, test_triple_pair
+
+def pair_construct_3(item_dict, num_items, train_neg_num, test_neg_num, random_seed = 1):
+
+    random.seed(random_seed)
+    all_items = np.arange(num_items)
+    com_edge_index = []
+    train_triple_pair = []
+    val_triple_pair = []
+    test_triple_pair = []
+    for key_item in item_dict.keys():
+        pos_list = item_dict[key_item]
+        neg_list = list(set(all_items)-set(pos_list))
+        #neg_sample = random.sample(neg_list, len(pos_list)+ 3 * neg_num - 2)
+        neg_sample = random.sample(neg_list, train_neg_num * len(pos_list) + 2 * test_neg_num)
+        if len(pos_list)<3:
+            for i in range(len(pos_list)):
+                tem = [int(key_item), int(pos_list[i])]
+                com_edge_index.append([int(key_item), int(pos_list[i])])
+                tem.extend(neg_sample[train_neg_num * i: train_neg_num * (i + 1)])
+                train_triple_pair.append(tem)
+            continue
+
+        for i in range(len(pos_list)-2):
+            tem = [int(key_item), int(pos_list[i])]
+            com_edge_index.append([int(key_item), int(pos_list[i])])
+            tem.extend(neg_sample[train_neg_num * i: train_neg_num * (i+1)])
+            train_triple_pair.append(tem)
+            #train_triple_pair.append([int(key_item), int(pos_list[i]), int(neg_sample[i])])
+
+        tem = [ int(key_item), int(pos_list[len(pos_list)-2])]
+        tem.extend(neg_sample[train_neg_num * len(pos_list):  train_neg_num * len(pos_list) + test_neg_num])
+        val_triple_pair.append(tem)
+
+        tem = [ int(key_item), int(pos_list[len(pos_list)-1])]
+        tem.extend(neg_sample[train_neg_num * len(pos_list) + test_neg_num: ])
+        test_triple_pair.append(tem)
+
+    train_triple_pair = np.array(train_triple_pair)
+    val_triple_pair = np.array(val_triple_pair)
+    test_triple_pair = np.array(test_triple_pair)
+
+    return com_edge_index, train_triple_pair, val_triple_pair, test_triple_pair
+
+def pair_construct_percent(item_dict, num_items, train_neg_num, test_neg_num, random_seed = 1):
+
+    random.seed(random_seed)
+    all_items = np.arange(num_items)
+    com_edge_index = []
+    train_triple_pair = []
+    val_triple_pair = []
+    test_triple_pair = []
+    for key_item in item_dict.keys():
+        pos_list = item_dict[key_item]
+        neg_list = list(set(all_items)-set(pos_list))
+        if (int(len(pos_list)*0.6) < len(pos_list)-2):
+            train_num = int(len(pos_list)*0.6)
+            val_num = 1
+            test_num = 1
+        else:
+            train_num = len(pos_list)-2
+            val_num = int(len(pos_list)*0.2)
+            test_num = len(pos_list)-train_num-val_num
+
+        neg_sample = random.sample(neg_list, train_neg_num * train_num + test_neg_num * (val_num + test_num))
+        for i in range(train_num):
+            com_edge_index.append([int(key_item), int(pos_list[i])])
+            tem = [int(key_item), int(pos_list[i])]
+            tem.extend(neg_sample[train_neg_num * i: train_neg_num * (i+1)])
+            train_triple_pair.append(tem)
+
+        for i in range(train_num, train_num+val_num ):
+            tem = [int(key_item), int(pos_list[i])]
+            tem.extend(neg_sample[train_neg_num * train_num + (i-train_num)*test_neg_num:
+                                  train_neg_num * train_num + (i-train_num+1)*test_neg_num])
+            val_triple_pair.append(tem)
+
+        for i in range(train_num+val_num, train_num+val_num+test_num):
+            tem = [int(key_item), int(pos_list[i])]
+            tem.extend(neg_sample[train_neg_num * train_num + (i-train_num)*test_neg_num:
+                                  train_neg_num * train_num + (i-train_num+1)*test_neg_num])
+            test_triple_pair.append(tem)
+
+    train_triple_pair = np.array(train_triple_pair)
+    val_triple_pair = np.array(val_triple_pair)
+    test_triple_pair = np.array(test_triple_pair)
+
+    return com_edge_index, train_triple_pair, val_triple_pair, test_triple_pair
 
 def load_dataset(dataset):
 
@@ -454,7 +543,7 @@ def load_dataset2(dataset):
 
 def load_dataset3(dataset):
 
-    path = './dataset/processed_val/' + str(dataset) + '.npz'
+    path = './dataset/processed_val/' + str(dataset) + '_contrastive.npz'
     data = np.load(path, allow_pickle=True)
 
     features = data['features']
@@ -465,6 +554,74 @@ def load_dataset3(dataset):
 
     return features, com_edge_index, train_set, val_set, test_set
 
+def load_dataset4(dataset):
+
+    path = './dataset/processed_val/' + str(dataset) + '_percent_price.npz'
+    data = np.load(path, allow_pickle=True)
+
+    features = data['features']
+    com_edge_index = data['com_edge_index']
+    sim_edge_index = data['sim_edge_index']
+    train_set = data['train_set']
+    val_set = data['val_set']
+    test_set = data['test_set']
+
+    path = './dataset/processed_val/' + str(dataset) + '_embeddings.npz'
+    data = np.load(path, allow_pickle=True)
+    cid3_emb = data['cid3_emb']
+    features = np.squeeze(np.array(features))
+    features = features[:,1].astype(int)
+    print(features.shape)
+    features = cid3_emb[features]
+    print(features.shape)
+    return features, com_edge_index, sim_edge_index, train_set, val_set, test_set
+
+
+def load_dataset4(dataset):
+    path = './dataset/processed_val/' + str(dataset) + '_percent_price.npz'
+    data = np.load(path, allow_pickle=True)
+
+    features = data['features']
+    com_edge_index = data['com_edge_index']
+    sim_edge_index = data['sim_edge_index']
+    train_set = data['train_set']
+    val_set = data['val_set']
+    test_set = data['test_set']
+
+    return features, com_edge_index, sim_edge_index, train_set, val_set, test_set
+
+
+def load_dataset_emb(dataset, price_n_bins = 20):
+    path = './dataset/processed_val/' + str(dataset) + '_price.npz'
+    data = np.load(path, allow_pickle=True)
+
+    features = data['features']
+    com_edge_index = data['com_edge_index']
+    sim_edge_index = data['sim_edge_index']
+    train_set = data['train_set']
+    val_set = data['val_set']
+    test_set = data['test_set']
+
+    ''' load category embedding'''
+    path = './data_preprocess/embs/' + dataset + '_embeddings.npz'
+    data = np.load(path, allow_pickle=True)
+    cid3_emb = data['cid3_emb']
+    cid2_emb = data['cid2_emb']
+    features = np.squeeze(np.array(features))
+    cid3 = features[:, 1].astype(int)
+    cid3_emb_feature = cid3_emb[cid3]
+    cid2 = features[:, 0].astype(int)
+    cid2_emb_feature = cid2_emb[cid2]
+
+    '''price bin'''
+    est = KBinsDiscretizer(n_bins=price_n_bins, encode="ordinal")
+    price = features[:, 2][:, np.newaxis]
+    est.fit(price)
+    price_bin = est.transform(price).squeeze()
+
+    #features_emb = np.concatenate((cid2_emb_feature, cid3_emb_feature, price_bin), axis=1)
+    category_emb = np.concatenate((cid2_emb_feature, cid3_emb_feature), axis=1)
+    return category_emb, price_bin, com_edge_index, sim_edge_index, train_set, val_set, test_set
 
 def generate_adj(edge_index, num_items):
 
@@ -481,13 +638,13 @@ def generate_adj(edge_index, num_items):
     # 将矩阵转为对称矩阵
     adj = adj + adj.T.multiply(adj.T > adj) - adj.multiply(adj.T > adj)
     #有对角线
-    #adj = row_normalize_adj(adj + sp.eye(adj.shape[0]))
-    adj = row_normalize_adj(adj)
+    #adj_nor = row_normalize_adj(adj + sp.eye(adj.shape[0]))
+    adj_nor = row_normalize_adj(adj)
+    adj_nor = sparse_mx_to_torch_sparse_tensor(adj_nor)
     adj = sparse_mx_to_torch_sparse_tensor(adj)
-
     print("finish generating adj")
 
-    return adj
+    return adj_nor, adj
 
 def generate_full_adj(train_mask, edge_index_list, labels, PA_list, character_list, num_items):
     if 1:
@@ -628,17 +785,14 @@ def generate_edge_label(train_mask, edge_index_list, labels):
 
 class Train_Dataset(Dataset):
 
-    def __init__(self, item_id, cat, PA, character):
-        self.item_id = item_id
-        self.cat = cat
-        self.PA = PA
-        self.character = character
+    def __init__(self, train_set):
+        self.train_set = train_set
 
     def __getitem__(self, index):
-        return self.item_id[index], self.cat[index], self.PA[index], self.character[index]
+        return self.train_set[index]
 
     def __len__(self):
-        return len(self.item_id)
+        return len(self.train_set)
 
 class Test_Dataset(Dataset):
 

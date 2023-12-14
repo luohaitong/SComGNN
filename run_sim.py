@@ -1,6 +1,6 @@
 import numpy as np
 
-from model_final import READ_pair_att_npair
+from model import READ_contra
 from utils import *
 from sklearn.metrics import roc_auc_score,f1_score,recall_score,precision_score,average_precision_score
 import random
@@ -57,9 +57,11 @@ if __name__ == '__main__':
     feature_size = features.shape[1]
 
     adj, adj_ori = generate_adj(com_edge_index, num_items)
+    sim_adj, sim_adj_ori = generate_adj(sim_edge_index, num_items)
 
     features = torch.FloatTensor(features).to(device)
     adj = adj.to(device)
+    sim_adj = sim_adj.to(device)
 
     train_set = torch.LongTensor(train_set).to(device)
     val_set = torch.LongTensor(val_set).to(device)
@@ -93,7 +95,7 @@ if __name__ == '__main__':
         random.seed(seed)
         os.environ['PYTHONHASHSEED'] = str(seed)
 
-        model = READ_pair_att_npair(feature_size, args.embedding_dim, num_layer)
+        model = READ_contra(feature_size, args.embedding_dim, num_layer)
 
         model = model.to(device)
         optimiser = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
@@ -107,7 +109,7 @@ if __name__ == '__main__':
 
             model.train()
             optimiser.zero_grad()
-            loss, mrr_score, hr_score, ndcg_score = model(features, adj, train_set, epoch)
+            loss, mrr_score, hr_score, ndcg_score = model(features, adj, train_set, epoch, sim_adj)
             loss.backward()
             optimiser.step()
 

@@ -12,8 +12,11 @@ if __name__ == '__main__':
     dataset = args.dataset
     neg_num = args.neg_num
 
-    dataset_path = './dataset/' + dataset + '.json'
-    save_path = './dataset/processed_val/' + dataset + '.npz'
+    path = './baseline_model/CIKM2020_DecGCN/preprocessing/data/'
+    dataset_path = path + dataset + '.json'
+
+    save_path = './dataset/processed_val/' + dataset + '_percent_price.npz'
+
     sim_dict = {}
     com_dict = {}
     sim_edge_index = []
@@ -46,11 +49,12 @@ if __name__ == '__main__':
 
     num_items = features.shape[0]
     feature_size = features.shape[1]
-    train_set, val_set, test_set = pair_construct_2(com_dict, num_items, neg_num)
+    train_com_edge_index, train_set, val_set, test_set = pair_construct_percent(com_dict, num_items, 2, neg_num)
 
-    np.savez(save_path, features=features, sim_edge_index = sim_edge_index, com_edge_index = com_edge_index,
+    np.savez(save_path, features = features, sim_edge_index = sim_edge_index, com_edge_index = train_com_edge_index,
              train_set = train_set, val_set = val_set, test_set = test_set)
     print("finished")
+
 
 
 

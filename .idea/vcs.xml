@@ -5,6 +5,7 @@
     <mapping directory="$PROJECT_DIR$/ANEMONE" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/CIKM2020_DecGCN" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/baseline_model/ANEMONE" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/baseline_model/AutoGCN" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/baseline_model/CIKM2020_DecGCN" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/baseline_model/cycle_gan_for_complementary_item_recommendations" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/final_model" vcs="Git" />
