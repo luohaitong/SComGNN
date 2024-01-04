@@ -1,17 +1,14 @@
+import sys
 from transformers import BertTokenizer, BertModel
-from utils import *
-import argparse
-
-parser = argparse.ArgumentParser(description='GCO')
-parser.add_argument('--dataset', type=str, default='Appliances')
-args = parser.parse_args()
+import pandas as pd
+import torch
+import numpy as np
 
 if __name__ == '__main__':
-
-    print('Dataset: {}'.format(args.dataset))
-    dataset = args.dataset
-    data_path1 = './baseline_model/CIKM2020_DecGCN/preprocessing/tmp/' + dataset + '_cid2_dict.txt'
-    data_path2 = './baseline_model/CIKM2020_DecGCN/preprocessing/tmp/' + dataset + '_cid3_dict.txt'
+    dataset = sys.argv[1]
+    print('Dataset: {}'.format(dataset))
+    data_path1 = './tmp/' + dataset + '_cid2_dict.txt'
+    data_path2 = './tmp/' + dataset + '_cid3_dict.txt'
     # 加载BERT预训练模型和分词器
     tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
     model = BertModel.from_pretrained('bert-base-uncased')
@@ -39,7 +36,7 @@ if __name__ == '__main__':
         embeddings_matrix = torch.cat(embeddings_matrix, dim=0)
         embedding_matrix_list.append(embeddings_matrix)
         print("emb shape:", embeddings_matrix.shape)
-    save_path = './dataset/processed_val/' + dataset + '_embeddings.npz'
+    save_path = './embs/' + dataset + '_embeddings.npz'
     np.savez(save_path, cid2_emb=embedding_matrix_list[0], cid3_emb=embedding_matrix_list[1])
     print("finished")
 

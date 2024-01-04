@@ -1,8 +1,5 @@
-import numpy as np
-
-from model_final import READ_pair_att_npair
+from model import SComGNN
 from utils import *
-from sklearn.metrics import roc_auc_score,f1_score,recall_score,precision_score,average_precision_score
 import random
 import os
 import argparse
@@ -10,21 +7,18 @@ import argparse
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 os.environ['OMP_NUM_THREADS'] = '1'
 
-parser = argparse.ArgumentParser(description='READ-GNN')
+parser = argparse.ArgumentParser(description='SComGNN')
 parser.add_argument('--ckpt_path', type=str, default='None')
 parser.add_argument('--device', type=str, default='cuda:0')
 parser.add_argument('--dataset', type=str, default='Appliances')
-parser.add_argument('--num_layer', type=int, default='1')
-parser.add_argument('--train_ratio', type=str, default='40')
-parser.add_argument('--neg_num', type=int, default=100)
-parser.add_argument('--lr', type=float, default=0.001)
+parser.add_argument('--lr', type=float, default=0.02)
 parser.add_argument('--weight_decay', type=float, default=5e-8)
 parser.add_argument('--runs', type=int, default=10)
 parser.add_argument('--embedding_dim', type=int, default=16)
 parser.add_argument('--patience', type=int, default=200)
 parser.add_argument('--num_epoch', type=int, default=200)
 parser.add_argument('--val_epoch', type=int, default=1)
-
+parser.add_argument('--mode', choices=["att", "concat", "mid", "low"], help='the version of models', default='att')
 
 args = parser.parse_args()
 
@@ -32,8 +26,6 @@ if __name__ == '__main__':
 
     print('Dataset: {}'.format(args.dataset), flush=True)
     device = torch.device(args.device)
-    num_layer = args.num_layer
-    neg_num = args.neg_num
     if args.ckpt_path == 'None':
         ckpt_path = 'checkpoints/' + str(args.dataset)
     else:
@@ -41,46 +33,27 @@ if __name__ == '__main__':
     if not os.path.exists(ckpt_path):
         os.mkdir(ckpt_path)
 
-
-    val_topk = 150
-    test_topk = 350
-
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
 
     seeds = [i + 1 for i in range(args.runs)]
 
     '''load dataset'''
-    features, com_edge_index, sim_edge_index, train_set, val_set, test_set = load_dataset4(args.dataset)
+    features, price_bin, com_edge_index, sim_edge_index, train_set, val_set, test_set = load_dataset(args.dataset)
 
     num_items = features.shape[0]
-    feature_size = features.shape[1]
-
-    adj, adj_ori = generate_adj(com_edge_index, num_items)
+    adj = generate_adj(com_edge_index, num_items)
 
     features = torch.FloatTensor(features).to(device)
+    price_bin = torch.LongTensor(price_bin).to(device)
     adj = adj.to(device)
-
     train_set = torch.LongTensor(train_set).to(device)
     val_set = torch.LongTensor(val_set).to(device)
     test_set = torch.LongTensor(test_set).to(device)
 
-    mean_mrr = []
-    mean_hr = []
+    mean_hr5 = []
+    mean_hr10 = []
     mean_ndcg = []
-    mean_val_auc = []
-    mean_test_auc = []
-    mean_val_prauc = []
-    mean_test_prauc = []
-    mean_val_f1 = []
-    mean_test_f1 = []
-    mean_val_recall = []
-    mean_test_recall = []
-    mean_val_precision = []
-    mean_test_precision = []
-    all_test_score = []
-    all_test_label = []
-    scaler = torch.cuda.amp.GradScaler()
 
     ''''train the model'''
     for run in range(args.runs):
@@ -93,43 +66,41 @@ if __name__ == '__main__':
         random.seed(seed)
         os.environ['PYTHONHASHSEED'] = str(seed)
 
-        model = READ_pair_att_npair(feature_size, args.embedding_dim, num_layer)
+        model = SComGNN(args.embedding_dim, 20, args.mode)
 
         model = model.to(device)
         optimiser = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 
         cnt_wait = 0
         best_epoch = 0
-        best_mrr = 0
-        best_hr = 0
+        best_hr5 = 0
+        best_hr10 = 0
         best_ndcg = 0
+
         for epoch in range(args.num_epoch):
 
             model.train()
             optimiser.zero_grad()
-            loss, mrr_score, hr_score, ndcg_score = model(features, adj, train_set, epoch)
+            loss = model(features, price_bin, adj, train_set)
             loss.backward()
             optimiser.step()
-
-            #print('Epoch:{} Loss:{:.8f} MRR:{:.4f} HR:{:.4f} NDCG:{:.4f}'.format(epoch, loss.item(), mrr_score.item(),
-                                                                       #hr_score.item(), ndcg_score.item()), flush=True)
             print('Epoch:{} Loss:{:.8f}'.format(epoch, loss.item()), flush=True)
+
             #validation
             if 1:
                 if epoch % args.val_epoch == 0:
                     with torch.no_grad():
                         model.eval()
-                        mrr_score, hr_score, ndcg_score = model.inference(features, adj, val_set)
-                        mrr_score = mrr_score.to(torch.device('cpu'))
-                        hr_score = hr_score.to(torch.device('cpu'))
-                        ndcg_score = ndcg_score.to(torch.device('cpu'))
+                        hr5_score, hr10_score, ndcg_score= model.inference(features, price_bin, adj, val_set)
 
-                    print('Epoch:{} Val MRR:{:.4f}, HR:{:.4f}, NDCG:{:.4f}'.format(
-                        epoch, mrr_score, hr_score, ndcg_score), flush=True)
+                        hr5_score = hr5_score.to(torch.device('cpu'))
+                        hr10_score = hr10_score.to(torch.device('cpu'))
+
+                    print('Epoch:{} Val HR@5:{:.4f}, HR@10:{:.4f} NDCG:{:.4f}'.format(epoch, hr5_score, hr10_score, ndcg_score), flush=True)
 
                     if ndcg_score > best_ndcg:
-                        best_mrr = mrr_score
-                        best_hr = hr_score
+                        best_hr5 = hr5_score
+                        best_hr10 = hr10_score
                         best_ndcg = ndcg_score
                         best_run = run
                         best_epoch = epoch
@@ -149,36 +120,20 @@ if __name__ == '__main__':
             print('Testing AUC!', flush=True)
             with torch.no_grad():
                 model.eval()
-                mrr_score, hr_score, ndcg_score = model.inference(features, adj, test_set)
-                mrr_score = mrr_score.to(torch.device('cpu'))
-                hr_score = hr_score.to(torch.device('cpu'))
-                ndcg_score = ndcg_score.to(torch.device('cpu'))
-                '''
-                adj_low = np.array(adj_low.to(torch.device('cpu')))
-                adj_mid = np.array(adj_mid.to(torch.device('cpu')))
-                adj_ori = np.array(adj.to(torch.device('cpu')).to_dense())
-                adj_low = pd.DataFrame(np.array(adj_low))
-                adj_mid = pd.DataFrame(np.array(adj_mid))
-                adj_ori = pd.DataFrame(np.array(adj_ori))
+                hr5_score, hr10_score, ndcg_score= model.inference(features, price_bin, adj, test_set)
+                hr5_score = hr5_score.to(torch.device('cpu'))
+                hr10_score = hr10_score.to(torch.device('cpu'))
 
-                adj_low.to_csv('adj_low.csv', index=False)
-                adj_mid.to_csv('adj_mid.csv', index=False)
-                adj_ori.to_csv('adj_ori.csv', index=False)
-                '''
-                #scores = np.array(scores.to(torch.device('cpu')))
-                #scores = pd.DataFrame(np.array(scores))
-                #scores.to_csv('test_scores.csv', index=False)
-
-            mean_mrr.append(mrr_score)
-            mean_hr.append(hr_score)
+            mean_hr5.append(hr5_score)
+            mean_hr10.append(hr10_score)
             mean_ndcg.append(ndcg_score)
-            print('Testing MRR:{:.4f}, HR:{:.4f}, NDCG:{:.4f}'.format(mrr_score, hr_score, ndcg_score),flush=True)
+            print('Testing HR@5:{:.4f}, HR@10:{:.4f}, NDCG:{:.4f}'.format(hr5_score, hr10_score, ndcg_score),flush=True)
 
 
     print("--------------------final results--------------------")
-    print('Test MRR: mean{:.4f}, std{:.4f}, max{:.4f}, min{:.4f}'.format(sum(mean_mrr)/len(mean_mrr), np.std(mean_mrr),
-        max(mean_mrr), min(mean_mrr)), flush=True)
-    print('Test HR: mean{:.4f}, std{:.4f}, max{:.4f}, min{:.4f}'.format(sum(mean_hr)/len(mean_hr), np.std(mean_hr),
-        max(mean_hr), min(mean_hr)), flush=True)
+    print('Test HR@5: mean{:.4f}, std{:.4f}, max{:.4f}, min{:.4f}'.format(sum(mean_hr5)/len(mean_hr5), np.std(mean_hr5),
+        max(mean_hr5), min(mean_hr5)), flush=True)
+    print('Test HR@10: mean{:.4f}, std{:.4f}, max{:.4f}, min{:.4f}'.format(sum(mean_hr10)/len(mean_hr10), np.std(mean_hr10),
+        max(mean_hr10), min(mean_hr10)), flush=True)
     print('Test NDCG: mean{:.4f}, std{:.4f}, max{:.4f}, min{:.4f}'.format(sum(mean_ndcg)/len(mean_ndcg), np.std(mean_ndcg),
         max(mean_ndcg), min(mean_ndcg)), flush=True)
