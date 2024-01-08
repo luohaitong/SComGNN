@@ -39,34 +39,28 @@ def fill_node_features(node_data, node_to_num_id, valid_node_asin):
         id_dict[s] = len(id_dict)
     return id_dict[s]
 
-  cid1_dict, cid2_dict, cid3_dict, bid_dict = {}, {}, {}, {}
-  node_features = {}
+  cid1_dict, cid2_dict, cid3_dict = {}, {}, {}
 
   for eachline in meta_file:
     data = eval(eachline)
     asin = data['asin']
     if asin in valid_node_asin:
       c1, c2, c3 = data['category'][1:4]
-      #brand = data['brand']
+
       price = data['price']
-      #imageurl = data['imageURLHighRes'][0]
+
       cid1, cid2, cid3 = id_mapping(c1, cid1_dict), id_mapping(c2, cid2_dict), \
                          id_mapping(c3, cid3_dict)
-      #bid = id_mapping(brand, bid_dict)
 
       num_id = node_to_num_id[asin]
 
       node_data[num_id]['uint64_feature'] = {"0": [cid2], "1": [cid3], "2": [float(price[1:])]}
-      #node_data[num_id]['uint64_feature'] = {"0": [cid2], "1": [cid3], "2": [imageurl]}
 
   for asin, num_id in cid2_dict.items():
     cid2_dict_file.write("{}\t{}\n".format(num_id, asin))
   for asin, num_id in cid3_dict.items():
     cid3_dict_file.write("{}\t{}\n".format(num_id, asin))
-  '''
-  for asin, num_id in bid_dict.items():
-    bid_dict_file.write("{}\t{}\n".format(num_id, asin))
-  '''
+
   feature_stats = "#cid2: {}; #cid3: {};".format(len(cid2_dict), len(cid3_dict))
   print(feature_stats)
   log_file.write(feature_stats + '\n')
@@ -115,25 +109,16 @@ def main():
 
   fill_node_features(node_data, node_to_num_id, valid_node_asin)
 
-  train_sim_num, train_cor_num = 0, 0
-  test_sim_num, test_cor_num = 0, 0
+  sim_num, cor_num = 0, 0
 
   for u in sorted(node_data.keys()):
     u_data = node_data[u]
     u_neighbor = node_data[u]['neighbor']
-    if len(u_neighbor['0']) > 0:
-      u_neighbor['0'] =  u_neighbor['0'][:-1]
-      u_neighbor['2'] =  u_neighbor['0'][-1:]
-      test_sim_num += 1
-    if len(u_neighbor['1']) > 0:
-      u_neighbor['1'] =  u_neighbor['1'][:-1]
-      u_neighbor['3'] =  u_neighbor['1'][-1:]
-      test_cor_num += 1
 
-    train_sim_num += len(u_neighbor['0'])
-    train_cor_num += len(u_neighbor['1'])
+    sim_num += len(u_neighbor['0'])
+    cor_num += len(u_neighbor['1'])
 
-    for edge_type in [0, 1, 2, 3]:
+    for edge_type in [0, 1]:
         for v in u_data['neighbor'][str(edge_type)]:
             uid, vid = u, v
             add_edge(uid, vid, edge_type, node_data)
@@ -142,14 +127,10 @@ def main():
     json.dump(u_data, out_file)
     out_file.write('\n')
 
-  sim_num = train_sim_num + test_sim_num
-  cor_num = train_cor_num + test_cor_num
 
   node_stats = "Total node num: {}".format(len(node_data)) 
-  edge_stats = "Total edge num: {}; sim: {}; cor: {}".format(sim_num + cor_num, sim_num, cor_num) 
-  train_stats = "Train -- sim edge num: {}; cor edge num: {}".format(train_sim_num, train_cor_num) 
-  test_stats = "Test -- sim edge num: {}; cor edge num: {}".format(test_sim_num, test_cor_num)
-  data_stats = "{}\n{}\n{}\n{}".format(node_stats, edge_stats, train_stats, test_stats)
+  edge_stats = "Total edge num: {}; sim: {}; cor: {}".format(sim_num + cor_num, sim_num, cor_num)
+  data_stats = "{}\n{}".format(node_stats, edge_stats)
 
   print(data_stats)
   log_file.write(data_stats)
@@ -174,7 +155,6 @@ if __name__ == '__main__':
   id_dict_file = open('./tmp/{}_id_dict.txt'.format(data_name), 'w')
   cid2_dict_file = open('./tmp/{}_cid2_dict.txt'.format(data_name), 'w')
   cid3_dict_file = open('./tmp/{}_cid3_dict.txt'.format(data_name), 'w')
-  bid_dict_file = open('./tmp/{}_bid_dict.txt'.format(data_name), 'w')
   out_file = open("./data/{}.json".format(data_name), 'w')
 
   main()

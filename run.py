@@ -11,7 +11,7 @@ parser = argparse.ArgumentParser(description='SComGNN')
 parser.add_argument('--ckpt_path', type=str, default='None')
 parser.add_argument('--device', type=str, default='cuda:0')
 parser.add_argument('--dataset', type=str, default='Appliances')
-parser.add_argument('--lr', type=float, default=0.02)
+parser.add_argument('--lr', type=float, default=0.005)
 parser.add_argument('--weight_decay', type=float, default=5e-8)
 parser.add_argument('--runs', type=int, default=10)
 parser.add_argument('--embedding_dim', type=int, default=16)
@@ -26,10 +26,15 @@ if __name__ == '__main__':
 
     print('Dataset: {}'.format(args.dataset), flush=True)
     device = torch.device(args.device)
+
+    ckpt_path = "checkpoints/"
+    if not os.path.exists(ckpt_path):
+        os.mkdir(ckpt_path)
+
     if args.ckpt_path == 'None':
-        ckpt_path = 'checkpoints/' + str(args.dataset)
+        ckpt_path = "checkpoints/{}".format(args.dataset)
     else:
-        ckpt_path = 'checkpoints/' + str(args.ckpt_path)
+        ckpt_path = "checkpoints/{}".format(args.ckpt_path)
     if not os.path.exists(ckpt_path):
         os.mkdir(ckpt_path)
 
@@ -38,8 +43,8 @@ if __name__ == '__main__':
 
     seeds = [i + 1 for i in range(args.runs)]
 
-    '''load dataset'''
-    features, price_bin, com_edge_index, sim_edge_index, train_set, val_set, test_set = load_dataset(args.dataset)
+    #load dataset
+    features, price_bin, com_edge_index, train_set, val_set, test_set = load_dataset(args.dataset)
 
     num_items = features.shape[0]
     adj = generate_adj(com_edge_index, num_items)
@@ -55,7 +60,7 @@ if __name__ == '__main__':
     mean_hr10 = []
     mean_ndcg = []
 
-    ''''train the model'''
+    #train the model
     for run in range(args.runs):
         seed = seeds[run]
         print('\n# Run:{} with random seed:{}'.format(run, seed), flush=True)

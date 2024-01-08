@@ -118,6 +118,10 @@ class Item_Graph_Convolution(nn.Module):
         self.gcn_mid = GCN_Mid(features_size, embedding_size)
         self.bn1 = nn.BatchNorm1d(embedding_size)
         self.bn2 = nn.BatchNorm1d(embedding_size)
+        if mode == "concat":
+            self.nn_cat = nn.Linear(2 * embedding_size, embedding_size)
+        else:
+            self.nn_cat = None
 
     def forward(self, feature, adj):
 

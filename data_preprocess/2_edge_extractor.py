@@ -15,28 +15,6 @@ def main():
     each_data = eval(eachline)
     asin = each_data['asin']
     all_asin.add(asin)
-  '''
-  for eachline in f:
-    each_data = eval(eachline)
-    asin = each_data['asin']
-    if 'related' in each_data:
-      related_data = each_data['related']
-
-      if 'also_viewed' in related_data:
-        for rid in related_data['also_viewed']:
-          if rid not in all_asin: continue
-          u, v = str(asin), str(rid)
-          if u > v: u, v = v, u
-          edge = (u, v)
-          sim_edges[edge] += 1
-      if 'also_bought' in related_data:
-        for rid in related_data['also_bought']:
-          if rid not in all_asin: continue
-          u, v = str(asin), str(rid)
-          if u > v: u, v = v, u
-          edge = (u, v)
-          rel_edges[edge] += 1
-  '''
 
   for eachline in f:
     each_data = eval(eachline)

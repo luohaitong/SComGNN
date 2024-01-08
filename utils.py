@@ -25,19 +25,16 @@ def sparse_mx_to_torch_sparse_tensor(sparse_mx):
 def load_dataset(dataset, price_n_bins = 20):
 
     #load data
-    path = './dataset/processed_val/' + str(dataset) + '_price.npz'
-    data = np.load(path, allow_pickle=True)
+    data = np.load("./data_preprocess/processed/{}.npz".format(dataset), allow_pickle=True)
 
     features = data['features']
     com_edge_index = data['com_edge_index']
-    sim_edge_index = data['sim_edge_index']
     train_set = data['train_set']
     val_set = data['val_set']
     test_set = data['test_set']
 
     #load category embedding
-    path = './data_preprocess/embs/' + dataset + '_embeddings.npz'
-    data = np.load(path, allow_pickle=True)
+    data = np.load("./data_preprocess/embs/{}_embeddings.npz".format(dataset), allow_pickle=True)
     cid3_emb = data['cid3_emb']
     cid2_emb = data['cid2_emb']
 
@@ -55,11 +52,10 @@ def load_dataset(dataset, price_n_bins = 20):
     est.fit(price)
     price_bin = est.transform(price).squeeze()
 
-    return category_emb, price_bin, com_edge_index, sim_edge_index, train_set, val_set, test_set
+    return category_emb, price_bin, com_edge_index, train_set, val_set, test_set
 
 def generate_adj(edge_index, num_items):
-
-    #generate sparse adj
+    '''generate sparse adj'''
     row = np.zeros(len(edge_index), dtype=np.int32)
     col = np.zeros(len(edge_index), dtype=np.int32)
 
@@ -69,12 +65,13 @@ def generate_adj(edge_index, num_items):
         col[cursor] = pair[1]
         cursor += 1
     adj = sp.coo_matrix((np.ones(len(row)), (row, col)), shape=(num_items, num_items), dtype=np.float32)
+
     #Turn the matrix into a symmetric matrix
     adj = adj + adj.T.multiply(adj.T > adj) - adj.multiply(adj.T > adj)
 
     adj_norm = row_normalize_adj(adj)
     adj_norm = sparse_mx_to_torch_sparse_tensor(adj_norm)
-    print("finish generating adj")
+    print("Finish generating adjacent matrix")
 
     return adj_norm
 

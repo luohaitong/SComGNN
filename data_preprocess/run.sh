@@ -2,14 +2,12 @@
 
 
 dataset=Appliances
-mkdir ../euler_data
-mkdir ../euler_data/$dataset
 
 mkdir stats 
 mkdir data 
 mkdir tmp
 mkdir embs
-mkdir imgs
+mkdir processed
 
 echo "---------------- step 1: feature filter ----------------"
 python 1_feature_filter.py $dataset
@@ -27,6 +25,10 @@ echo "---------------- step 4: data formulation --------------"
 python 4_data_formulator.py $dataset
 echo "--------------------------------------------------------"
 
-echo "---------------- step 5: category embedding --------------"
-python 5_category_embs.py $dataset
+echo "---------------- step 5: category embedding generation --------------"
+python 5_embs_generator.py $dataset
+echo "--------------------------------------------------------"
+
+echo "---------------- step 6: train-test-validation split --------------"
+python 6_dataset_split.py $dataset
 echo "--------------------------------------------------------"
