@@ -1,4 +1,4 @@
-#  Spectral-based Graph Neutral Networks for Complementary Item (AAAI 2024 Main Track)
+#  Spectral-based Graph Neural Networks for Complementary Item (AAAI 2024 Main Track)
 
 
 ## Dataset Preprocessing
